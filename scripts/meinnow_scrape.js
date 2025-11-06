@@ -250,54 +250,16 @@ async function runScrapeOnce() {
   }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function getDelayUntilNextRun(targetHour = 9, targetMinute = 0) {
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setHours(targetHour, targetMinute, 0, 0);
-
-  if (now <= nextRun) {
-    return nextRun.getTime() - now.getTime();
-  }
-
-  nextRun.setDate(nextRun.getDate() + 1);
-  return nextRun.getTime() - now.getTime();
-}
-
-function formatDateTime(date) {
-  try {
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch (error) {
-    return date.toISOString();
-  }
-}
-
 async function main() {
-  while (true) {
-    const delayMs = getDelayUntilNextRun(9, 0);
-    const nextRunTime = new Date(Date.now() + delayMs);
-
-    if (delayMs > 0) {
-      console.log(`⏳ Warte bis ${formatDateTime(nextRunTime)} für den nächsten Lauf.`);
-      await sleep(delayMs);
-    } else {
-      console.log('▶️ Starte sofort, geplanter Zeitpunkt erreicht.');
-    }
-
-    try {
-      await runScrapeOnce();
-    } catch (error) {
-      console.error('❌ Fehler im Scrape-Durchlauf:', error);
-    }
+  console.log('▶️ Starte einmaligen Scrape-Lauf.');
+  const start = Date.now();
+  try {
+    await runScrapeOnce();
+    const duration = ((Date.now() - start) / 1000).toFixed(1);
+    console.log(`✅ Scrape abgeschlossen (${duration}s).`);
+  } catch (error) {
+    console.error('❌ Fehler im Scrape-Durchlauf:', error);
+    process.exitCode = 1;
   }
 }
 
