@@ -166,13 +166,26 @@ async function scrapeOffers(page, keyword) {
 }
 
 async function runScrapeOnce() {
-  const slowMoEnv = Number.parseInt(process.env.PUPPETEER_SLOW_MO ?? '100', 10);
-  const browser = await puppeteer.launch({
-    headless: false,
-    defaultViewport: null,
-    args: ['--start-maximized'],
+  const headlessInput = (process.env.PUPPETEER_HEADLESS ?? 'true').toString().toLowerCase();
+  const headless = ['1', 'true', 'yes', 'on'].includes(headlessInput);
+  const slowMoEnv = Number.parseInt(process.env.PUPPETEER_SLOW_MO ?? '0', 10);
+  const launchOptions = {
+    headless,
+    defaultViewport: headless ? { width: 1280, height: 720 } : null,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      ...(headless ? [] : ['--start-maximized']),
+    ],
     slowMo: Number.isNaN(slowMoEnv) ? 0 : slowMoEnv,
-  });
+  };
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  console.log(`🚀 Starte Puppeteer (headless=${headless})`);
+  const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
 
   try {
