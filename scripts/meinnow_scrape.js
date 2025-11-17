@@ -8,17 +8,124 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 const BASE_SEARCH_URL = 'https://mein-now.de/weiterbildungssuche/';
 const LOAD_MORE_BUTTON_SELECTOR = '#load_more_angebote';
 const LOAD_MORE_ITERATIONS = 4;
-const SEARCH_KEYWORDS = [
-  'produktmanager',
-  'projektmanagement',
-  'sales',
-  'vertrieb',
+
+const ITS_KEYWORDS = [
+  'JavaScript',
+  'Python',
+  'SQL',
+  'Java',
+  'Künstliche Intelligenz',
+  'programmierung',
+  'App Programmieren Lernen',
+  'Excel Kurs',
+  'HTML',
+  'Maschinelles Lernen',
+  'Phyton Kurs',
+  'C++ Lernen',
+  'Apps programmieren',
+  'Java Script Lernen',
+  'Python3 Kurs',
+  'Javascripts Lernen',
+  'Informationstechnologie Weiterbildung',
+  'Programmierung Lernen',
+  'excel',
+  'Phyton Lernen',
+  'Quereinstieg It',
+  'informationstechnologie',
+  'programmiersprache',
+  'Programmiersprache Lernen',
+  'Hmtl Lernen',
+  'Javascript Lernen',
+  'C++',
+  'Excel Grundlagen',
+  'java script',
+  'Sql Lernen',
+  'Verkauf Kurs',
+  'Verkäufer werden',
+  'Verkauf lernen',
+  'Verkauf Training',
+  'verkaufen lernen',
+  'Vertrieb lernen',
+  'Vertrieb Einstieg',
+  'Verkäufer Weiterbildung',
+  'Verkauf ohne Erfahrung',
+  'Sales',
+  'Quereinstieg Verkauf',
+  'Verkauf Schulung',
+  'Vertriebs Kurs',
+  'Vertrieb Training',
+  'Telefonverkauf Kurs',
+  'Kaltakquise lernen',
+  'Verkäufer Job',
+  'IT Sales',
 ];
+
+const PM_KEYWORDS = [
+  'Produktmanager',
+  'Controller Weiterbildung',
+  'Kooperation',
+  'Weiterbildung Qualitätsmanager',
+  'pflegedienstleitung',
+  'Controlling',
+  'Qualitätsmanagment Weiterbildung',
+  'Qualitätsmanagment',
+  'Controlling Weiterbildung',
+  'Projektmanagement',
+  'Qualitätsmanagement',
+  'Weiterbildung Projektmanager',
+  'Projektmanager Weiterbildung',
+  'projektmanagement',
+  'Soziales Lernen',
+  'soziale Arbeit',
+  'controlling',
+  'qualitätsmanagement',
+  'Qualitätsmanagement Weiterbildung',
+  'Marketing Weiterbildung',
+  'Vertrieb',
+  'Quereinstieg Vertrieb',
+  'Coaching Weiterbildung',
+  'Handelsfachwirt Weiterbildung',
+  'Ihk Weiterbildung',
+  'Industriekauffrau Weiterbildung',
+  'Betriebswirt Weiterbildung',
+  'Fachwirt Weiterbildung',
+  'Betriebswirt Weiterbildung',
+  'Fachwirt Weiterbildung',
+  'Projektmanagement',
+  'Projektmanager',
+  'Projektmanagement lernen',
+  'Projektplanung lernen',
+  'PM Weiterbildung',
+  'Projektleiten lernen',
+  'Projektmanagement Basics',
+  'Projektmanager Einstieg',
+  'PM Einsteiger',
+  'Projektmanagement Schulung',
+  'Projektmanagement Fortbildung',
+  'Quereinstieg Projektmanagement',
+  'Projektmanagement Job',
+  'PM Grundlagen',
+  'PM Training',
+  'Projektarbeit lernen',
+  'PM Kurs',
+  'Teamarbeit lernen',
+];
+
+const SEARCH_KEYWORDS = [...ITS_KEYWORDS, ...PM_KEYWORDS];
+
+const KEYWORD_CATEGORY_MAP = new Map();
+ITS_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'ITS'));
+PM_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'PM'));
+
+function getKeywordCategory(keyword) {
+  return KEYWORD_CATEGORY_MAP.get(keyword.toLowerCase()) || 'UNKNOWN';
+}
+
 const VISIBILITY_PATTERNS = {
   forward: /forward/i,
   franklin: /franklin/i,
 };
-const APP_SCRIPT_URL = process.env.GOOGLE_SHEET_APP_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyuopZkF_1x3QSFmb_Dn2-ql6lQrSogdCjHMFMwBwOPZWZkKvSCy6qY_zG08a2oSOTM/exec';
+const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZjui3kQep0Hivd2Srr1BW3s2YOV9iQa2awE9Dp-gl2alqOgTccn9dbjszyKHzlCNQ/exec';
 
 async function postVisibilityMetrics(entries) {
   if (!APP_SCRIPT_URL) {
@@ -31,6 +138,7 @@ async function postVisibilityMetrics(entries) {
       action: 'visibility_metrics',
       date: entry.date,
       keyword: entry.keyword,
+      category: entry.category,
       forward_visibility_percent: entry.metrics.forward,
       franklin_visibility_percent: entry.metrics.franklin,
     };
@@ -219,7 +327,7 @@ async function runScrapeOnce() {
       console.log(`\n📦 Ergebnis gespeichert unter ${aggregatePath}`);
 
       const today = new Date().toISOString().split('T')[0];
-      const summaryHeader = ['date', 'keyword'];
+      const summaryHeader = ['date', 'keyword', 'category'];
       for (const label of Object.keys(VISIBILITY_PATTERNS)) {
         summaryHeader.push(`${label}_visibility_percent`);
       }
@@ -241,10 +349,12 @@ async function runScrapeOnce() {
           metrics[label] = Number(visibility.toFixed(2));
         }
 
-        summaryLines.push(`${today},${keyword},${visibilityValues.join(',')}`);
+        const category = getKeywordCategory(keyword);
+        summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')}`);
         summaryEntries.push({
           date: today,
           keyword,
+          category,
           metrics,
         });
       }
