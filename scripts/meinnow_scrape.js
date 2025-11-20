@@ -343,14 +343,21 @@ async function runScrapeOnce() {
   const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
 
-  try {
-    const allOffers = [];
+  const allOffers = [];
+  const successfulKeywords = new Set();
+  const failedKeywords = [];
 
-    for (const keyword of SEARCH_KEYWORDS) {
+  // Jedes Keyword einzeln scrapen, damit Fehler bei einem Keyword nicht alles stoppen
+  for (const keyword of SEARCH_KEYWORDS) {
+    try {
       const searchUrl = buildSearchUrl(keyword);
       console.log(`\n🔎 Starte Keyword "${keyword}" → ${searchUrl}`);
 
-      await page.goto(searchUrl, { waitUntil: 'networkidle2' });
+      // Timeout erhöht auf 60 Sekunden für langsame Seiten
+      await page.goto(searchUrl, { 
+        waitUntil: 'networkidle2',
+        timeout: 60000 
+      });
 
       for (let i = 0; i < LOAD_MORE_ITERATIONS; i += 1) {
         const success = await clickLoadMore(page);
@@ -365,59 +372,75 @@ async function runScrapeOnce() {
       console.log(`Insgesamt ${offers.length} Angebote für Keyword "${keyword}".`);
 
       allOffers.push(...offers);
+      successfulKeywords.add(keyword);
+    } catch (error) {
+      console.error(`❌ Fehler beim Scrapen von Keyword "${keyword}":`, error.message);
+      failedKeywords.push({ keyword, error: error.message });
+      // Weiter mit dem nächsten Keyword
     }
-
-    if (allOffers.length > 0) {
-      const aggregatePath = path.resolve(process.cwd(), 'data', 'meinnow_offers_all.json');
-      await fs.mkdir(path.dirname(aggregatePath), { recursive: true });
-      await fs.writeFile(aggregatePath, JSON.stringify(allOffers, null, 2), 'utf8');
-      console.log(`\n📦 Ergebnis gespeichert unter ${aggregatePath}`);
-
-      const today = new Date().toISOString().split('T')[0];
-      const summaryHeader = ['date', 'keyword', 'category'];
-      for (const label of Object.keys(VISIBILITY_PATTERNS)) {
-        summaryHeader.push(`${label}_visibility_percent`);
-      }
-      const summaryLines = [summaryHeader.join(',')];
-      const summaryEntries = [];
-
-      for (const keyword of SEARCH_KEYWORDS) {
-        const offersForKeyword = allOffers.filter(offer => offer.keyword === keyword);
-        const totalCount = offersForKeyword.length;
-        const visibilityValues = [];
-        const metrics = {};
-
-        for (const [label, pattern] of Object.entries(VISIBILITY_PATTERNS)) {
-          const matchCount = offersForKeyword.filter(offer =>
-            offer.provider && pattern.test(offer.provider),
-          ).length;
-          const visibility = totalCount === 0 ? 0 : (matchCount / totalCount) * 100;
-          visibilityValues.push(`${visibility.toFixed(2)}%`);
-          metrics[label] = Number(visibility.toFixed(2));
-        }
-
-        const category = getKeywordCategory(keyword);
-        summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')}`);
-        summaryEntries.push({
-          date: today,
-          keyword,
-          category,
-          metrics,
-        });
-      }
-
-      const summaryPath = path.resolve(process.cwd(), 'data', 'meinnow_forward_visibility.csv');
-      await fs.mkdir(path.dirname(summaryPath), { recursive: true });
-      await fs.writeFile(summaryPath, summaryLines.join('\n'), 'utf8');
-      console.log(`📈 Sichtbarkeitsübersicht gespeichert unter ${summaryPath}`);
-
-      await postVisibilityMetrics(summaryEntries);
-    }
-  } catch (error) {
-    console.error('Fehler beim Scrapen:', error);
-  } finally {
-    await browser.close();
   }
+
+  // Zusammenfassung der erfolgreichen/fehlgeschlagenen Keywords
+  console.log(`\n📊 Scraping-Zusammenfassung: ${successfulKeywords.size} erfolgreich, ${failedKeywords.length} fehlgeschlagen von ${SEARCH_KEYWORDS.length} Keywords.`);
+  if (failedKeywords.length > 0) {
+    console.log('⚠️ Fehlgeschlagene Keywords:');
+    failedKeywords.forEach(({ keyword, error }) => {
+      console.log(`   - ${keyword}: ${error}`);
+    });
+  }
+
+  // Visibility-Metriken für ALLE Keywords berechnen (auch die, die fehlgeschlagen sind)
+  const today = new Date().toISOString().split('T')[0];
+  const summaryHeader = ['date', 'keyword', 'category'];
+  for (const label of Object.keys(VISIBILITY_PATTERNS)) {
+    summaryHeader.push(`${label}_visibility_percent`);
+  }
+  const summaryLines = [summaryHeader.join(',')];
+  const summaryEntries = [];
+
+  for (const keyword of SEARCH_KEYWORDS) {
+    const offersForKeyword = allOffers.filter(offer => offer.keyword === keyword);
+    const totalCount = offersForKeyword.length;
+    const visibilityValues = [];
+    const metrics = {};
+
+    for (const [label, pattern] of Object.entries(VISIBILITY_PATTERNS)) {
+      const matchCount = offersForKeyword.filter(offer =>
+        offer.provider && pattern.test(offer.provider),
+      ).length;
+      const visibility = totalCount === 0 ? 0 : (matchCount / totalCount) * 100;
+      visibilityValues.push(`${visibility.toFixed(2)}%`);
+      metrics[label] = Number(visibility.toFixed(2));
+    }
+
+    const category = getKeywordCategory(keyword);
+    summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')}`);
+    summaryEntries.push({
+      date: today,
+      keyword,
+      category,
+      metrics,
+    });
+  }
+
+  // Dateien speichern
+  if (allOffers.length > 0) {
+    const aggregatePath = path.resolve(process.cwd(), 'data', 'meinnow_offers_all.json');
+    await fs.mkdir(path.dirname(aggregatePath), { recursive: true });
+    await fs.writeFile(aggregatePath, JSON.stringify(allOffers, null, 2), 'utf8');
+    console.log(`\n📦 Ergebnis gespeichert unter ${aggregatePath}`);
+  }
+
+  const summaryPath = path.resolve(process.cwd(), 'data', 'meinnow_forward_visibility.csv');
+  await fs.mkdir(path.dirname(summaryPath), { recursive: true });
+  await fs.writeFile(summaryPath, summaryLines.join('\n'), 'utf8');
+  console.log(`📈 Sichtbarkeitsübersicht gespeichert unter ${summaryPath}`);
+
+  // WICHTIG: POSTs IMMER ausführen, auch wenn einige Keywords fehlgeschlagen sind
+  console.log(`\n📤 Starte POST von ${summaryEntries.length} Visibility-Metriken an Google Sheets...`);
+  await postVisibilityMetrics(summaryEntries);
+
+  await browser.close();
 }
 
 async function main() {
