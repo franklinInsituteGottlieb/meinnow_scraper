@@ -127,13 +127,27 @@ const VISIBILITY_PATTERNS = {
 };
 const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZjui3kQep0Hivd2Srr1BW3s2YOV9iQa2awE9Dp-gl2alqOgTccn9dbjszyKHzlCNQ/exec';
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function postVisibilityMetrics(entries) {
   if (!APP_SCRIPT_URL) {
     console.warn('⚠️ GOOGLE_SHEET_APP_SCRIPT_URL nicht gesetzt – überspringe API-POST.');
     return;
   }
 
-  for (const entry of entries) {
+  const POST_DELAY_MS = 500; // Delay zwischen POSTs, um Rate-Limiting zu vermeiden
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 2000; // Delay bei Retry nach Rate-Limit
+
+  let successCount = 0;
+  let failCount = 0;
+
+  console.log(`\n📤 Starte POST von ${entries.length} Einträgen an Google Sheets...`);
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const entry = entries[i];
     const payload = {
       action: 'visibility_metrics',
       date: entry.date,
@@ -143,26 +157,59 @@ async function postVisibilityMetrics(entries) {
       franklin_visibility_percent: entry.metrics.franklin,
     };
 
-    try {
-      const response = await fetch(APP_SCRIPT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+    let retries = 0;
+    let success = false;
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`HTTP ${response.status} ${response.statusText}: ${text}`);
+    while (retries <= MAX_RETRIES && !success) {
+      try {
+        const response = await fetch(APP_SCRIPT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          
+          // Rate-Limiting (429) → Retry mit Delay
+          if (response.status === 429 && retries < MAX_RETRIES) {
+            retries += 1;
+            console.warn(`⚠️ Rate-Limit bei ${entry.keyword}, Retry ${retries}/${MAX_RETRIES} in ${RETRY_DELAY_MS}ms...`);
+            await sleep(RETRY_DELAY_MS);
+            continue;
+          }
+          
+          throw new Error(`HTTP ${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
+        }
+
+        const resultText = await response.text();
+        console.log(`✅ [${i + 1}/${entries.length}] ${entry.keyword} (${entry.category}): gespeichert`);
+        success = true;
+        successCount += 1;
+      } catch (error) {
+        if (retries < MAX_RETRIES && error.message.includes('429')) {
+          retries += 1;
+          console.warn(`⚠️ Rate-Limit bei ${entry.keyword}, Retry ${retries}/${MAX_RETRIES} in ${RETRY_DELAY_MS}ms...`);
+          await sleep(RETRY_DELAY_MS);
+          continue;
+        }
+        
+        console.error(`❌ [${i + 1}/${entries.length}] Fehler bei ${entry.keyword} (${entry.date}):`, error.message);
+        failCount += 1;
+        success = false;
+        break;
       }
+    }
 
-      const resultText = await response.text();
-      console.log(`📤 Sichtbarkeit gesendet (${entry.keyword}, ${entry.date}):`, resultText);
-    } catch (error) {
-      console.error(`❌ Fehler beim Senden (${entry.keyword}, ${entry.date}):`, error.message);
+    // Delay zwischen POSTs (außer beim letzten)
+    if (i < entries.length - 1) {
+      await sleep(POST_DELAY_MS);
     }
   }
+
+  console.log(`\n📊 POST-Zusammenfassung: ${successCount} erfolgreich, ${failCount} fehlgeschlagen von ${entries.length} Einträgen.`);
 }
 
 async function waitForNetworkIdle(page, timeout = 500, maxInflight = 2) {
