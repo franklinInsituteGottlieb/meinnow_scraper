@@ -45,9 +45,26 @@ const PM_KEYWORDS = [
   'PM Training', 'Projektarbeit lernen', 'PM Kurs', 'Teamarbeit lernen',
 ];
 
+const AI_AUTOMATION_KEYWORDS = [
+  'KI Consultant', 'KI Berater', 'KI & Automation Consultant', 'KI Consultant Weiterbildung',
+  'Automation Specialist', 'Automation Manager', 'Automatisierung Manager',
+  'Process Manager Digitalisierung','Marketing Automation', 'Marketing Automation Manager', 'Marketing Automation Weiterbildung',
+  'Sales Automation','Vertrieb Automation', 'CRM Automation',
+  'Low-Code Developer', 'No-Code Developer', 'Zapier', 'Make', 'n8n', 'Airtable',
+  'AI Product Manager', 'KI Produktmanager', 'Digital Transformation Manager',
+  'Chatbot', 'KI Chatbot', 'AI Chatbot', 'KI Support', 'AI Support',
+  'Prompt Engineering', 'KI Tools', 'Machine Learning', 'Maschinelles Lernen',
+  'KI Strategie', 'AI Strategie', 'KI Einführung', 'AI Einführung',
+  'KI Marketing', 'AI Marketing', 'Marketing 4.0', 'Vertrieb 4.0',
+  'KI Vertrieb', 'AI Sales', 'Sales 4.0',
+  'KI lernen', 'AI lernen', 'KI Kurs', 'AI Kurs', 'Quereinstieg KI',
+  'KI Job', 'KI Karriere',
+];
+
 const KEYWORD_CATEGORY_MAP = new Map();
 ITS_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'ITS'));
 PM_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'PM'));
+AI_AUTOMATION_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'AI_AUTOMATION'));
 
 function getKeywordCategory(keyword) {
   return KEYWORD_CATEGORY_MAP.get(keyword.toLowerCase()) || 'UNKNOWN';
