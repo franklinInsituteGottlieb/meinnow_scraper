@@ -48,7 +48,8 @@ const PM_KEYWORDS = [
 const AI_AUTOMATION_KEYWORDS = [
   'KI Consultant', 'KI Berater', 'KI & Automation Consultant', 'KI Consultant Weiterbildung',
   'Automation Specialist', 'Automation Manager', 'Automatisierung Manager',
-  'Process Manager Digitalisierung','Marketing Automation', 'Marketing Automation Manager', 'Marketing Automation Weiterbildung',
+  'Process Manager Digitalisierung', 'Marketing Automation', 'Marketing Automation Manager', 
+  'Marketing Automation Weiterbildung',
   'Sales Automation','Vertrieb Automation', 'CRM Automation',
   'Low-Code Developer', 'No-Code Developer', 'Zapier', 'Make', 'n8n', 'Airtable',
   'AI Product Manager', 'KI Produktmanager', 'Digital Transformation Manager',
