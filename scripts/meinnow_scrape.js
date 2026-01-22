@@ -142,6 +142,7 @@ function getKeywordCategory(keyword) {
 const VISIBILITY_PATTERNS = {
   forward: /forward/i,
   franklin: /franklin/i,
+  impaqt: /impaqt/i,
 };
 const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZjui3kQep0Hivd2Srr1BW3s2YOV9iQa2awE9Dp-gl2alqOgTccn9dbjszyKHzlCNQ/exec';
 
@@ -171,9 +172,11 @@ async function postVisibilityMetrics(entries) {
       date: entry.date,
       keyword: entry.keyword,
       category: entry.category,
-      forward_visibility_percent: entry.metrics.forward,
-      franklin_visibility_percent: entry.metrics.franklin,
     };
+    // Dynamisch alle Metriken hinzufügen
+    for (const [label, value] of Object.entries(entry.metrics)) {
+      payload[`${label}_visibility_percent`] = value;
+    }
 
     let retries = 0;
     let success = false;

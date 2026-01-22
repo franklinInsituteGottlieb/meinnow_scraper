@@ -94,12 +94,19 @@ async function loadCsv() {
   const dateIdx = headers.indexOf('date');
   const keywordIdx = headers.indexOf('keyword');
   const categoryIdx = headers.indexOf('category');
-  const forwardIdx = headers.indexOf('forward_visibility_percent');
-  const franklinIdx = headers.indexOf('franklin_visibility_percent');
 
   if (dateIdx === -1 || keywordIdx === -1) {
     throw new Error('CSV benötigt mindestens die Spalten "date" und "keyword".');
   }
+
+  // Finde alle Visibility-Spalten dynamisch
+  const visibilityIndices = {};
+  headers.forEach((header, idx) => {
+    if (header.endsWith('_visibility_percent')) {
+      const label = header.replace('_visibility_percent', '');
+      visibilityIndices[label] = idx;
+    }
+  });
 
   return lines.slice(1).map(line => {
     const cells = line.split(',').map(cell => cell.trim());
@@ -107,13 +114,19 @@ async function loadCsv() {
     const category = categoryIdx !== -1 
       ? (cells[categoryIdx] || getKeywordCategory(keyword))
       : getKeywordCategory(keyword);
-    return {
+    
+    const entry = {
       date: cells[dateIdx] || '',
       keyword,
       category,
-      forward: forwardIdx === -1 ? null : parsePercent(cells[forwardIdx]),
-      franklin: franklinIdx === -1 ? null : parsePercent(cells[franklinIdx]),
     };
+    
+    // Dynamisch alle Visibility-Werte hinzufügen
+    for (const [label, idx] of Object.entries(visibilityIndices)) {
+      entry[label] = idx === -1 ? null : parsePercent(cells[idx]);
+    }
+    
+    return entry;
   });
 }
 
@@ -123,9 +136,14 @@ async function postVisibility(entry) {
     date: entry.date,
     keyword: entry.keyword,
     category: entry.category,
-    forward_visibility_percent: entry.forward,
-    franklin_visibility_percent: entry.franklin,
   };
+  
+  // Dynamisch alle Visibility-Metriken hinzufügen
+  for (const [key, value] of Object.entries(entry)) {
+    if (key !== 'date' && key !== 'keyword' && key !== 'category') {
+      payload[`${key}_visibility_percent`] = value;
+    }
+  }
 
   const response = await fetch(APP_SCRIPT_URL, {
     method: 'POST',
