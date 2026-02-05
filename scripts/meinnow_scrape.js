@@ -9,134 +9,46 @@ const BASE_SEARCH_URL = 'https://mein-now.de/weiterbildungssuche/';
 const LOAD_MORE_BUTTON_SELECTOR = '#load_more_angebote';
 const LOAD_MORE_ITERATIONS = 4;
 
-const ITS_KEYWORDS = [
-  'JavaScript',
-  'Python',
-  'SQL',
-  'Java',
-  'Künstliche Intelligenz',
-  'programmierung',
-  'App Programmieren Lernen',
-  'Excel Kurs',
-  'HTML',
-  'Maschinelles Lernen',
-  'Phyton Kurs',
-  'C++ Lernen',
-  'Apps programmieren',
-  'Java Script Lernen',
-  'Python3 Kurs',
-  'Javascripts Lernen',
-  'Informationstechnologie Weiterbildung',
-  'Programmierung Lernen',
-  'excel',
-  'Phyton Lernen',
-  'Quereinstieg It',
-  'informationstechnologie',
-  'programmiersprache',
-  'Programmiersprache Lernen',
-  'Hmtl Lernen',
-  'Javascript Lernen',
-  'C++',
-  'Excel Grundlagen',
-  'java script',
-  'Sql Lernen',
-  'Verkauf Kurs',
-  'Verkäufer werden',
-  'Verkauf lernen',
-  'Verkauf Training',
-  'verkaufen lernen',
-  'Vertrieb lernen',
-  'Vertrieb Einstieg',
-  'Verkäufer Weiterbildung',
-  'Verkauf ohne Erfahrung',
-  'Sales',
-  'Quereinstieg Verkauf',
-  'Verkauf Schulung',
-  'Vertriebs Kurs',
-  'Vertrieb Training',
-  'Telefonverkauf Kurs',
-  'Kaltakquise lernen',
-  'Verkäufer Job',
-  'IT Sales',
-];
+const KEYWORDS_CSV_PATH = path.resolve(__dirname, '..', 'keywords_vertical.csv');
 
-const PM_KEYWORDS = [
-  'Produktmanager',
-  'Controller Weiterbildung',
-  'Kooperation',
-  'Weiterbildung Qualitätsmanager',
-  'pflegedienstleitung',
-  'Controlling',
-  'Qualitätsmanagment Weiterbildung',
-  'Qualitätsmanagment',
-  'Controlling Weiterbildung',
-  'Projektmanagement',
-  'Qualitätsmanagement',
-  'Weiterbildung Projektmanager',
-  'Projektmanager Weiterbildung',
-  'projektmanagement',
-  'Soziales Lernen',
-  'soziale Arbeit',
-  'controlling',
-  'qualitätsmanagement',
-  'Qualitätsmanagement Weiterbildung',
-  'Marketing Weiterbildung',
-  'Vertrieb',
-  'Quereinstieg Vertrieb',
-  'Coaching Weiterbildung',
-  'Handelsfachwirt Weiterbildung',
-  'Ihk Weiterbildung',
-  'Industriekauffrau Weiterbildung',
-  'Betriebswirt Weiterbildung',
-  'Fachwirt Weiterbildung',
-  'Betriebswirt Weiterbildung',
-  'Fachwirt Weiterbildung',
-  'Projektmanagement',
-  'Projektmanager',
-  'Projektmanagement lernen',
-  'Projektplanung lernen',
-  'PM Weiterbildung',
-  'Projektleiten lernen',
-  'Projektmanagement Basics',
-  'Projektmanager Einstieg',
-  'PM Einsteiger',
-  'Projektmanagement Schulung',
-  'Projektmanagement Fortbildung',
-  'Quereinstieg Projektmanagement',
-  'Projektmanagement Job',
-  'PM Grundlagen',
-  'PM Training',
-  'Projektarbeit lernen',
-  'PM Kurs',
-  'Teamarbeit lernen',
-];
+/** Lädt Keywords und Vertical aus keywords_vertical.csv (Spalte weight wird ignoriert). */
+async function loadKeywordsFromCsv() {
+  const raw = await fs.readFile(KEYWORDS_CSV_PATH, 'utf8');
+  const lines = raw
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
 
-const AI_AUTOMATION_KEYWORDS = [
-  'KI Consultant', 'KI Berater', 'KI & Automation Consultant', 'KI Consultant Weiterbildung',
-  'Automation Specialist', 'Automation Manager', 'Automatisierung Manager',
-  'Process Manager Digitalisierung', 'Marketing Automation', 'Marketing Automation Manager', 
-  'Marketing Automation Weiterbildung',
-  'Sales Automation', 'Vertrieb Automation', 'CRM Automation',
-  'Low-Code Developer', 'No-Code Developer', 'Zapier', 'Make', 'n8n', 'Airtable',
-  'AI Product Manager', 'KI Produktmanager', 'Digital Transformation Manager',
-  'Chatbot', 'KI Chatbot', 'AI Chatbot', 'KI Support', 'AI Support',
-  'Prompt Engineering', 'KI Tools', 'Machine Learning', 'Maschinelles Lernen',
-  'KI Strategie', 'AI Strategie', 'KI Einführung', 'AI Einführung',
-  'KI Marketing', 'AI Marketing', 'Marketing 4.0', 'Vertrieb 4.0',
-  'KI Vertrieb', 'AI Sales', 'Sales 4.0',
-  'KI lernen', 'AI lernen', 'KI Kurs', 'AI Kurs', 'Quereinstieg KI',
-  'KI Job', 'KI Karriere',
-];
+  if (lines.length <= 1) {
+    throw new Error('keywords_vertical.csv enthält keine Datenzeilen.');
+  }
 
-const SEARCH_KEYWORDS = [...ITS_KEYWORDS, ...PM_KEYWORDS, ...AI_AUTOMATION_KEYWORDS];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const keywordIdx = headers.indexOf('keyword');
+  const verticalIdx = headers.indexOf('vertical');
 
-const KEYWORD_CATEGORY_MAP = new Map();
-ITS_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'ITS'));
-PM_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'PM'));
-AI_AUTOMATION_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'AI_AUTOMATION'));
+  if (keywordIdx === -1 || verticalIdx === -1) {
+    throw new Error('keywords_vertical.csv benötigt die Spalten "keyword" und "vertical".');
+  }
 
-function getKeywordCategory(keyword) {
-  return KEYWORD_CATEGORY_MAP.get(keyword.toLowerCase()) || 'UNKNOWN';
+  const searchKeywords = [];
+  const categoryMap = new Map();
+
+  for (let i = 1; i < lines.length; i += 1) {
+    const cells = lines[i].split(',').map(c => c.trim());
+    const keyword = cells[keywordIdx] ?? '';
+    const vertical = cells[verticalIdx] ?? 'UNKNOWN';
+    if (keyword) {
+      searchKeywords.push(keyword);
+      categoryMap.set(keyword.toLowerCase(), vertical);
+    }
+  }
+
+  return { searchKeywords, categoryMap };
+}
+
+function getKeywordCategory(keyword, categoryMap) {
+  return categoryMap.get(keyword.toLowerCase()) || 'UNKNOWN';
 }
 
 const VISIBILITY_PATTERNS = {
@@ -360,6 +272,9 @@ async function runScrapeOnce() {
     launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
+  const { searchKeywords, categoryMap } = await loadKeywordsFromCsv();
+  console.log(`📋 ${searchKeywords.length} Keywords aus ${KEYWORDS_CSV_PATH} geladen.`);
+
   console.log(`🚀 Starte Puppeteer (headless=${headless})`);
   const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
@@ -369,7 +284,7 @@ async function runScrapeOnce() {
   const failedKeywords = [];
 
   // Jedes Keyword einzeln scrapen, damit Fehler bei einem Keyword nicht alles stoppen
-  for (const keyword of SEARCH_KEYWORDS) {
+  for (const keyword of searchKeywords) {
     try {
       const searchUrl = buildSearchUrl(keyword);
       console.log(`\n🔎 Starte Keyword "${keyword}" → ${searchUrl}`);
@@ -402,7 +317,7 @@ async function runScrapeOnce() {
   }
 
   // Zusammenfassung der erfolgreichen/fehlgeschlagenen Keywords
-  console.log(`\n📊 Scraping-Zusammenfassung: ${successfulKeywords.size} erfolgreich, ${failedKeywords.length} fehlgeschlagen von ${SEARCH_KEYWORDS.length} Keywords.`);
+  console.log(`\n📊 Scraping-Zusammenfassung: ${successfulKeywords.size} erfolgreich, ${failedKeywords.length} fehlgeschlagen von ${searchKeywords.length} Keywords.`);
   if (failedKeywords.length > 0) {
     console.log('⚠️ Fehlgeschlagene Keywords:');
     failedKeywords.forEach(({ keyword, error }) => {
@@ -419,7 +334,7 @@ async function runScrapeOnce() {
   const summaryLines = [summaryHeader.join(',')];
   const summaryEntries = [];
 
-  for (const keyword of SEARCH_KEYWORDS) {
+  for (const keyword of searchKeywords) {
     const offersForKeyword = allOffers.filter(offer => offer.keyword === keyword);
     const totalCount = offersForKeyword.length;
     const visibilityValues = [];
@@ -434,7 +349,7 @@ async function runScrapeOnce() {
       metrics[label] = Number(visibility.toFixed(2));
     }
 
-    const category = getKeywordCategory(keyword);
+    const category = getKeywordCategory(keyword, categoryMap);
     summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')}`);
     summaryEntries.push({
       date: today,

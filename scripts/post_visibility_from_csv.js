@@ -5,70 +5,43 @@ const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const CSV_PATH = path.resolve(__dirname, '..', 'data', 'meinnow_forward_visibility.csv');
+const KEYWORDS_CSV_PATH = path.resolve(__dirname, '..', 'keywords_vertical.csv');
 const APP_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxZjui3kQep0Hivd2Srr1BW3s2YOV9iQa2awE9Dp-gl2alqOgTccn9dbjszyKHzlCNQ/exec';
 
-// Keyword-Kategorien (aus meinnow_scrape.js)
-const ITS_KEYWORDS = [
-  'JavaScript', 'Python', 'SQL', 'Java', 'Künstliche Intelligenz',
-  'programmierung', 'App Programmieren Lernen', 'Excel Kurs', 'HTML',
-  'Maschinelles Lernen', 'Phyton Kurs', 'C++ Lernen', 'Apps programmieren',
-  'Java Script Lernen', 'Python3 Kurs', 'Javascripts Lernen',
-  'Informationstechnologie Weiterbildung', 'Programmierung Lernen', 'excel',
-  'Phyton Lernen', 'Quereinstieg It', 'informationstechnologie',
-  'programmiersprache', 'Programmiersprache Lernen', 'Hmtl Lernen',
-  'Javascript Lernen', 'C++', 'Excel Grundlagen', 'java script', 'Sql Lernen',
-  'Verkauf Kurs', 'Verkäufer werden', 'Verkauf lernen', 'Verkauf Training',
-  'verkaufen lernen', 'Vertrieb lernen', 'Vertrieb Einstieg',
-  'Verkäufer Weiterbildung', 'Verkauf ohne Erfahrung', 'Sales',
-  'Quereinstieg Verkauf', 'Verkauf Schulung', 'Vertriebs Kurs',
-  'Vertrieb Training', 'Telefonverkauf Kurs', 'Kaltakquise lernen',
-  'Verkäufer Job', 'IT Sales',
-];
+/** Lädt Keyword → Vertical aus keywords_vertical.csv (weight wird ignoriert). */
+async function loadKeywordCategoryMap() {
+  const raw = await fs.readFile(KEYWORDS_CSV_PATH, 'utf8');
+  const lines = raw
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
 
-const PM_KEYWORDS = [
-  'Controller Weiterbildung', 'Kooperation', 'Weiterbildung Qualitätsmanager',
-  'pflegedienstleitung', 'Controlling', 'Qualitätsmanagment Weiterbildung',
-  'Qualitätsmanagment', 'Controlling Weiterbildung', 'Projektmanagement',
-  'Projektmanagement Weiterbildung', 'Qualitätsmanagement',
-  'Weiterbildung Projektmanager', 'Projektmanager Weiterbildung',
-  'projektmanagement', 'Soziales Lernen', 'soziale Arbeit', 'controlling',
-  'qualitätsmanagement', 'Qualitätsmanagement Weiterbildung',
-  'Marketing Weiterbildung', 'Vertrieb', 'Quereinstieg Vertrieb',
-  'Coaching Weiterbildung', 'Handelsfachwirt Weiterbildung',
-  'Ihk Weiterbildung', 'Industriekauffrau Weiterbildung',
-  'Betriebswirt Weiterbildung', 'Fachwirt Weiterbildung',
-  'Projektmanagement', 'Projektmanager', 'Projektmanagement lernen',
-  'Projektplanung lernen', 'PM Weiterbildung', 'Projektleiten lernen',
-  'Projektmanagement Basics', 'Projektmanager Einstieg', 'PM Einsteiger',
-  'Projektmanagement Schulung', 'Projektmanagement Fortbildung',
-  'Quereinstieg Projektmanagement', 'Projektmanagement Job', 'PM Grundlagen',
-  'PM Training', 'Projektarbeit lernen', 'PM Kurs', 'Teamarbeit lernen',
-];
+  if (lines.length <= 1) {
+    return new Map();
+  }
 
-const AI_AUTOMATION_KEYWORDS = [
-  'KI Consultant', 'KI Berater', 'KI & Automation Consultant', 'KI Consultant Weiterbildung',
-  'Automation Specialist', 'Automation Manager', 'Automatisierung Manager',
-  'Process Manager Digitalisierung', 'Marketing Automation', 'Marketing Automation Manager', 
-  'Marketing Automation Weiterbildung',
-  'Sales Automation','Vertrieb Automation', 'CRM Automation',
-  'Low-Code Developer', 'No-Code Developer', 'Zapier', 'Make', 'n8n', 'Airtable',
-  'AI Product Manager', 'KI Produktmanager', 'Digital Transformation Manager',
-  'Chatbot', 'KI Chatbot', 'AI Chatbot', 'KI Support', 'AI Support',
-  'Prompt Engineering', 'KI Tools', 'Machine Learning', 'Maschinelles Lernen',
-  'KI Strategie', 'AI Strategie', 'KI Einführung', 'AI Einführung',
-  'KI Marketing', 'AI Marketing', 'Marketing 4.0', 'Vertrieb 4.0',
-  'KI Vertrieb', 'AI Sales', 'Sales 4.0',
-  'KI lernen', 'AI lernen', 'KI Kurs', 'AI Kurs', 'Quereinstieg KI',
-  'KI Job', 'KI Karriere',
-];
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const keywordIdx = headers.indexOf('keyword');
+  const verticalIdx = headers.indexOf('vertical');
 
-const KEYWORD_CATEGORY_MAP = new Map();
-ITS_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'ITS'));
-PM_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'PM'));
-AI_AUTOMATION_KEYWORDS.forEach(kw => KEYWORD_CATEGORY_MAP.set(kw.toLowerCase(), 'AI_AUTOMATION'));
+  if (keywordIdx === -1 || verticalIdx === -1) {
+    throw new Error('keywords_vertical.csv benötigt die Spalten "keyword" und "vertical".');
+  }
 
-function getKeywordCategory(keyword) {
-  return KEYWORD_CATEGORY_MAP.get(keyword.toLowerCase()) || 'UNKNOWN';
+  const map = new Map();
+  for (let i = 1; i < lines.length; i += 1) {
+    const cells = lines[i].split(',').map(c => c.trim());
+    const keyword = cells[keywordIdx] ?? '';
+    const vertical = cells[verticalIdx] ?? 'UNKNOWN';
+    if (keyword) {
+      map.set(keyword.toLowerCase(), vertical);
+    }
+  }
+  return map;
+}
+
+function getKeywordCategory(keyword, categoryMap) {
+  return categoryMap.get(keyword.toLowerCase()) || 'UNKNOWN';
 }
 
 function parsePercent(value) {
@@ -78,7 +51,7 @@ function parsePercent(value) {
   return Number.isFinite(num) ? num : 0;
 }
 
-async function loadCsv() {
+async function loadCsv(categoryMap) {
   const raw = await fs.readFile(CSV_PATH, 'utf8');
   const lines = raw
     .split(/\r?\n/)
@@ -111,9 +84,9 @@ async function loadCsv() {
   return lines.slice(1).map(line => {
     const cells = line.split(',').map(cell => cell.trim());
     const keyword = cells[keywordIdx] || '';
-    const category = categoryIdx !== -1 
-      ? (cells[categoryIdx] || getKeywordCategory(keyword))
-      : getKeywordCategory(keyword);
+    const category = categoryIdx !== -1
+      ? (cells[categoryIdx] || getKeywordCategory(keyword, categoryMap))
+      : getKeywordCategory(keyword, categoryMap);
     
     const entry = {
       date: cells[dateIdx] || '',
@@ -170,8 +143,10 @@ async function postVisibility(entry) {
 }
 
 async function main() {
+  console.log('📂 Lade Keyword-Verticals aus keywords_vertical.csv...');
+  const categoryMap = await loadKeywordCategoryMap();
   console.log('📂 Lade CSV-Daten...');
-  const entries = await loadCsv();
+  const entries = await loadCsv(categoryMap);
 
   if (entries.length === 0) {
     console.log('Keine Einträge zum Senden.');

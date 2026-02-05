@@ -33,6 +33,7 @@ async function loadCsv(filePath = DEFAULT_INPUT_PATH) {
   const keywordIdx = headers.indexOf('keyword');
   const forwardIdx = headers.indexOf('forward_visibility_percent');
   const franklinIdx = headers.indexOf('franklin_visibility_percent');
+  const impaqtIdx = headers.indexOf('impaqt_visibility_percent');
 
   if (dateIdx === -1 || keywordIdx === -1) {
     throw new Error('CSV benötigt mindestens die Spalten "date" und "keyword".');
@@ -45,6 +46,7 @@ async function loadCsv(filePath = DEFAULT_INPUT_PATH) {
       keyword: cells[keywordIdx] ?? '',
       forward: forwardIdx === -1 ? null : parsePercent(cells[forwardIdx]),
       franklin: franklinIdx === -1 ? null : parsePercent(cells[franklinIdx]),
+      impaqt: impaqtIdx === -1 ? null : parsePercent(cells[impaqtIdx]),
     };
   });
 }
@@ -55,6 +57,7 @@ async function postVisibility(entry, options = {}) {
     brand: entry.keyword,
     forward_visibility_percent: entry.forward,
     franklin_visibility_percent: entry.franklin,
+    impaqt_visibility_percent: entry.impaqt,
     source: 'visibility_csv',
   };
 
