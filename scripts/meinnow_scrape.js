@@ -84,6 +84,7 @@ async function postVisibilityMetrics(entries) {
       date: entry.date,
       keyword: entry.keyword,
       category: entry.category,
+      visibility_total: entry.visibility_total ?? 0,
     };
     // Dynamisch alle Metriken hinzufügen
     for (const [label, value] of Object.entries(entry.metrics)) {
@@ -331,6 +332,7 @@ async function runScrapeOnce() {
   for (const label of Object.keys(VISIBILITY_PATTERNS)) {
     summaryHeader.push(`${label}_visibility_percent`);
   }
+  summaryHeader.push('visibility_total');
   const summaryLines = [summaryHeader.join(',')];
   const summaryEntries = [];
 
@@ -350,12 +352,13 @@ async function runScrapeOnce() {
     }
 
     const category = getKeywordCategory(keyword, categoryMap);
-    summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')}`);
+    summaryLines.push(`${today},${keyword},${category},${visibilityValues.join(',')},${totalCount}`);
     summaryEntries.push({
       date: today,
       keyword,
       category,
       metrics,
+      visibility_total: totalCount,
     });
   }
 

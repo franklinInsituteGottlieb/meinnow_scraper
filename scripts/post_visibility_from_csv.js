@@ -80,6 +80,7 @@ async function loadCsv(categoryMap) {
       visibilityIndices[label] = idx;
     }
   });
+  const visibilityTotalIdx = headers.indexOf('visibility_total');
 
   return lines.slice(1).map(line => {
     const cells = line.split(',').map(cell => cell.trim());
@@ -94,10 +95,11 @@ async function loadCsv(categoryMap) {
       category,
     };
     
-    // Dynamisch alle Visibility-Werte hinzufügen
     for (const [label, idx] of Object.entries(visibilityIndices)) {
       entry[label] = idx === -1 ? null : parsePercent(cells[idx]);
     }
+    const totalRaw = visibilityTotalIdx >= 0 ? cells[visibilityTotalIdx] : '';
+    entry.visibility_total = totalRaw === '' || totalRaw === null ? 0 : Number(totalRaw) || 0;
     
     return entry;
   });
@@ -109,11 +111,11 @@ async function postVisibility(entry) {
     date: entry.date,
     keyword: entry.keyword,
     category: entry.category,
+    visibility_total: entry.visibility_total ?? 0,
   };
   
-  // Dynamisch alle Visibility-Metriken hinzufügen
   for (const [key, value] of Object.entries(entry)) {
-    if (key !== 'date' && key !== 'keyword' && key !== 'category') {
+    if (key !== 'date' && key !== 'keyword' && key !== 'category' && key !== 'visibility_total') {
       payload[`${key}_visibility_percent`] = value;
     }
   }
